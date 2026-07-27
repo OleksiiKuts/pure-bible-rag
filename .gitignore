@@ -2,3 +2,8 @@
 .env
 __pycache__/
 bible_parsed.json
+
+.env
+.venv/
+__pycache__/
+data/
