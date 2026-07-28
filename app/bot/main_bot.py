@@ -8,7 +8,7 @@ from aiogram.filters import CommandStart
 load_dotenv()
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-API_URL = "http://127.0.0.1:8000/api/v1/search"
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/api/v1/search")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()

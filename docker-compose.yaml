@@ -42,6 +42,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       - DATABASE_URL=postgresql://user:password@db:5432/bible_db
+      - API_URL=http://web:8000/api/v1/search
     env_file:
       - .env
     depends_on:
