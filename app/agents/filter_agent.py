@@ -1,4 +1,5 @@
 import os
+import urllib.parse as urlparse
 import json
 import psycopg2
 import requests
@@ -16,12 +17,16 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
+# Динамічне підключення до БД (працює як локально, так і всередині Docker)
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/bible_db")
+url = urlparse.urlparse(DATABASE_URL)
+
 DB_CONFIG = {
-    "dbname": "bible_db", 
-    "user": "user", 
-    "password": "password", 
-    "host": "localhost", 
-    "port": "5432"
+    "dbname": url.path[1:],
+    "user": url.username,
+    "password": url.password,
+    "host": url.hostname,
+    "port": url.port
 }
 
 # --- СТРУКТУРА ВІДПОВІДІ (JSON SCHEMA) ---
