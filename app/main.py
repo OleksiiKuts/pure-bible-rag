@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from app.agents.filter_agent import run_semantic_filter
 
@@ -15,9 +16,13 @@ class SearchResponse(BaseModel):
     approved_verses: list[dict]
     rejected_verses: list[dict]
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def read_root():
-    return {"status": "ok", "message": "Pure Bible RAG API is running"}
+    try:
+        with open("app/static/index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "<h1>Файл інтерфейсу не знайдено</h1>"
 
 @app.post("/api/v1/search", response_model=SearchResponse)
 def search_bible(request: SearchRequest):

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pure Bible RAG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans antialiased min-h-screen flex flex-col items-center py-12 px-4">
+    <div class="max-w-2xl w-full bg-white shadow-lg rounded-xl p-8 border border-gray-100">
+        <h1 class="text-3xl font-bold text-center mb-2 text-blue-600">📖 Pure Bible RAG</h1>
+        <p class="text-center text-gray-500 mb-8 text-sm">Точний семантичний пошук по Біблії без галюцинацій</p>
+        
+        <div class="flex gap-3 mb-6">
+            <input id="queryInput" type="text" placeholder="Введіть запитання (наприклад: про гнів, любов, надію)..." 
+                   class="flex-1 border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                   onkeydown="if(event.key === 'Enter') searchBible()">
+            <button onclick="searchBible()" class="bg-blue-600 text-white font-medium px-6 py-3 rounded-lg hover:bg-blue-700 transition text-sm shadow-sm">Шукати</button>
+        </div>
+        
+        <div id="loading" class="hidden text-center text-gray-500 my-6">🔍 Шукаю відповідь у базі...</div>
+        <div id="results" class="space-y-4"></div>
+    </div>
+
+    <script>
+        async function searchBible() {
+            const query = document.getElementById('queryInput').value;
+            if (!query.trim()) return;
+            
+            const loading = document.getElementById('loading');
+            const resultsContainer = document.getElementById('results');
+            
+            loading.classList.remove('hidden');
+            resultsContainer.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/v1/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                const data = await response.json();
+                
+                loading.classList.add('hidden');
+                
+                if (!data.approved_verses || data.approved_verses.length === 0) {
+                    resultsContainer.innerHTML = '<div class="p-4 bg-gray-50 rounded-lg text-center text-gray-500 text-sm">На жаль, релевантних уривків за вашим запитом не знайдено.</div>';
+                    return;
+                }
+                
+                let html = '<h2 class="text-base font-semibold mb-3 text-gray-800">✅ Знайдені уривки:</h2>';
+                data.approved_verses.forEach(v => {
+                    html += `<div class="border-l-4 border-blue-500 bg-blue-50/50 p-4 rounded-r-lg mb-3 shadow-sm">
+                        <h3 class="font-bold text-blue-900 text-sm mb-1">${v.reference}</h3>
+                        <p class="text-gray-700 text-sm leading-relaxed">${v.text}</p>
+                    </div>`;
+                });
+                resultsContainer.innerHTML = html;
+            } catch (error) {
+                loading.classList.add('hidden');
+                resultsContainer.innerHTML = '<div class="p-4 bg-red-50 rounded-lg text-center text-red-500 text-sm">❌ Помилка при підключенні до сервера API.</div>';
+            }
+        }
+    </script>
+</body>
+</html>
