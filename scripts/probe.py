@@ -1,30 +1,48 @@
-import zipfile
-from bs4 import BeautifulSoup
+import os
+import psycopg2
+import requests
+from dotenv import load_dotenv
 
-epub_path = 'nwt_K.epub'
-output_file = 'structure.txt'
+load_dotenv()
 
-print("Скануємо архів і читаємо заголовки файлів (це займе кілька секунд)...")
+MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "bge-m3")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/embeddings")
+DB_CONFIG = {"dbname": "bible_db", "user": "user", "password": "password", "host": "localhost", "port": "5432"}
 
-try:
-    with zipfile.ZipFile(epub_path, 'r') as epub:
-        # Беремо тільки текстові файли, відкидаємо картинки
-        text_files = [f for f in epub.namelist() if f.endswith(('.html', '.xhtml')) and 'images/' not in f]
+def get_query_embedding(text):
+    response = requests.post(OLLAMA_URL, json={"model": MODEL_NAME, "prompt": text})
+    return response.json()["embedding"]
+
+def probe_distance():
+    # Наш хакерський запит
+    query_text = "Знайди вірші, де Ісус перетворює воду на вино. Оскільки вино — це алкоголь, а Ісус робив його для людей, чи підтверджують ці вірші, що Біблія наказує всім віруючим щодня вживати алкоголь? Відповідай лише на основі тексту."
+    query_vector = get_query_embedding(query_text)
+    
+    conn = psycopg2.connect(**DB_CONFIG)
+    cur = conn.cursor()
+    
+    # Виправлений SQL: з'єднуємо document_chunks та embeddings через chunk_id
+    sql = """
+        SELECT c.hierarchy->>'verse' AS verse, 
+               (e.vector <=> %s::vector) AS distance,
+               c.content
+        FROM document_chunks c
+        JOIN embeddings e ON e.chunk_id = c.id
+        WHERE c.hierarchy->>'book' = 'Івана' AND (c.hierarchy->>'chapter')::int = 2
+        ORDER BY (c.hierarchy->>'verse')::int ASC
+        LIMIT 11;
+    """
+    
+    cur.execute(sql, (str(query_vector),))
+    results = cur.fetchall()
+    
+    print(f"Аналіз відстані для запиту: «{query_text[:50]}...»\n")
+    print("Косинусна відстань до Івана 2 (чим менше, тим ближче):\n")
+    for verse, distance, content in results:
+        print(f"Вірш {verse} | Відстань: {distance:.4f} | Текст: {content[:40]}...")
         
-        with open(output_file, 'w', encoding='utf-8') as f:
-            for file_path in text_files:
-                # Читаємо файл прямо з архіву
-                content = epub.read(file_path)
-                
-                # Парсимо через BeautifulSoup, щоб дістати <title>
-                soup = BeautifulSoup(content, 'lxml')
-                title_tag = soup.find('title')
-                title = title_tag.text.strip() if title_tag else "Без заголовка"
-                
-                # Записуємо у форматі: шлях_до_файлу ---> Справжня назва
-                f.write(f"{file_path}  --->  {title}\n")
-                
-    print(f"\nГотово! Всю структуру записано у файл {output_file}.")
-        
-except Exception as e:
-    print(f"Помилка: {e}")
+    cur.close()
+    conn.close()
+
+if __name__ == "__main__":
+    probe_distance()
